@@ -10,9 +10,10 @@
 ]>
 
 <targetDefinitions>
-  <board id="nucleouart">
-    <name>NucleoUART</name>
+  <board id="multizap++">
+    <name>MultiZAP++</name>
     <dbgIF>SWD</dbgIF>
+    <dbgIF>JTAG</dbgIF>
     <dbgDEV>ST-Link</dbgDEV>
     <mcuId>stm32l432kcux</mcuId>
   </board>

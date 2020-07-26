@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <launchConfiguration type="fr.ac6.mcu.debug.config.launchConfigurationType">
-<stringAttribute key="DEBBUGER_BOARD_NAME" value="NucleoUART"/>
+<stringAttribute key="DEBBUGER_BOARD_NAME" value="MultiZAP++"/>
 <stringAttribute key="DEBBUGER_CORE_NAME" value=""/>
 <stringAttribute key="DEBBUGER_MCU_NAME" value="STM32L432KCUx"/>
 <stringAttribute key="fr.ac6.mcu.ide.DBG_DEVICE" value="ST-Link"/>
