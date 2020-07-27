@@ -13,10 +13,9 @@
 #ifndef MULTIZAP_PROGRAMS_H_
 #define MULTIZAP_PROGRAMS_H_
 
-#define EEPROM_SIZE 256  			// MAX 2048 now in the .ld file DATA
 #define PAGE_SIZE 0x800				// 2kb pages
-#define FLASH_STORAGE 0x0803F800  	// DATA section beginning, save_to_flash beginning
-
+#define FLASH_STORAGE	0x0803F800  // DATA section beginning, save_to_flash beginning
+#define FLASH_START		0x08000000  // FLASH section beginning,
 
 char *eeprom_Data_Chr   = (char*)FLASH_STORAGE;
 
@@ -90,7 +89,7 @@ const program internalProgram[] = {
             ":4\n"
     		"#1 Borrelia 30m\n"
     		"wait 3000\n"
-    		"pbar 100 1800"
+    		"pbar 100 1800\n"
     		"beep 100\n"
     		"freq 3408600 180\n"
     		"freq 4105500 180\n"
@@ -190,7 +189,7 @@ const program internalProgram[] = {
             ":7\n"
     		"#4 Borrelia 72m\n"
     		"wait 3000\n"
-    		"pbar 100 4320"
+    		"pbar 100 4320\n"
     		"beep 100\n"
     		"freq 3408600 180\n"
     		"freq 4105500 180\n"

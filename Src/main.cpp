@@ -75,7 +75,7 @@ static void MX_USART1_UART_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MAX_BUFF_SIZE 1024
+
 #define MAX_CMD_PARAMS 3
 
 struct paramstruc{
@@ -88,7 +88,7 @@ char LF = '\n';
 
 volatile bool com_arrived = false;
 string welcome_str = EOL+"Hello World !!!"+EOL+">";
-uint8_t tx_buffer[MAX_BUFF_SIZE];
+string tx_buffer = "";
 volatile bool uart_TX_busy = false;
 volatile bool abort_Prog_Run = false;// Abort Command Interpreter running
 uint8_t rx_data; 			// Serial receive char
@@ -127,9 +127,9 @@ void save_to_flash(const program data)
 	  HAL_FLASH_Unlock();
 	  FLASH_EraseInitTypeDef EraseInitStruct;
 	  EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
-	  EraseInitStruct.Page = 127;
-//	  volatile uint16_t pages = (data.length()/page_size) + (int)((data.length()%page_size) != 0);
-	  EraseInitStruct.NbPages = 1;
+	  EraseInitStruct.Page = (FLASH_STORAGE-FLASH_START)/PAGE_SIZE;
+	  volatile uint16_t pages = (data.item.length()/PAGE_SIZE) + (int)((data.item.length()%PAGE_SIZE) != 0);
+	  EraseInitStruct.NbPages = pages;
 	  uint32_t PageError;
 	  volatile HAL_StatusTypeDef status;
 	  if(HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK){
@@ -156,10 +156,9 @@ void uart_TX_IT(string inputString){
 	while (uart_TX_busy){ // Wait empty TX buffer
 		;
 	}
-	uint16_t lg = (inputString.length() < MAX_BUFF_SIZE) ? inputString.length() : MAX_BUFF_SIZE;
-	for (uint16_t i = 0; i < lg; i++)
-		tx_buffer[i] = inputString[i];
-	HAL_UART_Transmit_IT(&huart2, tx_buffer, lg);
+	tx_buffer = "";
+	tx_buffer += inputString;
+	HAL_UART_Transmit_IT(&huart2, (uint8_t *) tx_buffer.c_str(), tx_buffer.length());
 	uart_TX_busy = true;
 }
 
@@ -202,20 +201,17 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac)
 
 void start_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim, uint16_t psc, uint16_t arr)
 {
-	if (psc > BIOZAP_SAMPLE_SIZE)
-		psc = BIOZAP_SAMPLE_SIZE;
-	BIOZAP_Sample_Lgth = psc;
+	BIOZAP_Sample_Lgth = min(psc,(uint16_t)BIOZAP_SAMPLE_SIZE);
 	generate_sample(0, 4095, BIOZAP_SIN, BIOZAP_SampleArray);
-
-	__HAL_DAC_ENABLE(hdac, DAC_CHANNEL_1);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)BIOZAP_SampleArray, BIOZAP_Sample_Lgth, DAC_ALIGN_12B_R);
+	HAL_TIM_Base_Start(&htim6);
 	__HAL_TIM_SET_AUTORELOAD(htim, arr);
 }
 
 void stop_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim)
 {
-	__HAL_TIM_SET_AUTORELOAD(htim, 0 - 1);
-	__HAL_DAC_DISABLE(hdac, DAC_CHANNEL_1);
+	HAL_DAC_Stop_DMA(&hdac1, DAC_CHANNEL_1);
+	HAL_TIM_Base_Stop(&htim6);
 }
 
 
@@ -240,14 +236,9 @@ void getParams(string inputString, paramstruc* param){
 
 void findAndReplaceAll(std::string & data, std::string toSearch, std::string replaceStr)
 {
-	// Get the first occurrence
-	size_t pos = data.find(toSearch);
-
-	// Repeat till end is reached
-	while( pos != std::string::npos)
-	{
-		// Replace this occurrence of Sub String
-		data.replace(pos, toSearch.size(), replaceStr);
+	size_t pos = data.find(toSearch);	// Get the first occurrence
+	while( pos != std::string::npos) {	// Repeat till end is reached
+		data.replace(pos, toSearch.size(), replaceStr); // Replace Sub String
 		// Get the next occurrence from the current position
 		pos =data.find(toSearch, pos + replaceStr.size());
 	}
@@ -291,22 +282,16 @@ void Command_Interpreter(string comm_Str)
 			abort_Prog_Run = false;
 			return;
 		}
-		else if(param.param[0].length() == 0){  // I checked this, later param[0].at(0) chashed an empty string
+		else if(param.param[0].length() == 0){  // Have to checked this, later param[0].at(0) chashed an empty string
 			uart_TX_IT("empty command !"+EOL);
 		}
 		else if (param.param[0] == "freq") {
-			double freq = std::stod(param.param[1]);
-			freq /= 100;
-
+			uint32_t freq = std::stod(param.param[1]);
 			freq_item element = find_time_freq(&htim6, freq);
 			if(element.error < 1.0){
-
 				start_DMA(&hdac1, DAC_CHANNEL_1, &htim6, element.psc - 1, element.arr - 1);
-				uart_TX_IT("freq:" + to_string(element.freq) + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr) + " working ...  ");
-
-				uint32_t delay = std::stol(param.param[2]);
-				delay *= 10; //  + 000 after the test !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-				Delay(delay);
+				uart_TX_IT("freq:" + to_string(element.freq) + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr-1) + " working ...  ");
+				Delay(std::stol(param.param[2])*1000);
 				stop_DMA(&hdac1, DAC_CHANNEL_1, &htim6);
 				send_ok_to_uart();
 			}
@@ -397,9 +382,7 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_TIM_Base_Start(&htim6);
-
-  uart_TX_IT(welcome_str);  // Welcome to Serial
+  uart_TX_IT(welcome_str);  // Welcome string to Serial
   HAL_UART_Receive_IT(&huart2, &rx_data, 1);  // Serial receive starting.
 
 /*
@@ -411,7 +394,7 @@ int main(void)
   		"beep 500\n"
   		"off\n"
     };
-    save_to_flash(userProgram);
+    save_to_flash(userProgram); // If userProgram too big change the DATA location, now 2k the size !!!
 */
   read_flash(&user_Program);
 

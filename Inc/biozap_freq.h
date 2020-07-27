@@ -36,15 +36,14 @@ uint16_t BIOZAP_DutyCycle = 50;
 struct freq_item{
 	uint16_t psc;
 	uint16_t arr;
-	float error;
+	double error;
 	uint32_t freq;
-	uint8_t gcd;
 };
 
 static uint8_t generate_sin_sample (uint16_t v_min, uint16_t v_max, uint16_t *sample_array);
 static uint8_t generate_saw_sample (uint16_t v_min, uint16_t v_max, uint16_t *sample_array);
 static uint8_t generate_rec_sample (uint16_t v_min, uint16_t v_max, uint16_t *sample_array);
-static freq_item find_time_freq(TIM_HandleTypeDef *htim, double freq);
+static freq_item find_time_freq(TIM_HandleTypeDef *htim, uint32_t freq);
 void set_time_freq(TIM_HandleTypeDef *htim, uint16_t psc, uint16_t arr);
 
 
@@ -96,11 +95,6 @@ static uint8_t generate_sin_sample(uint16_t v_min, uint16_t v_max , uint16_t *sa
 		sample_array[i] = ( sin(i*step) + 1) * (v_max-v_min)/2.0 + v_min ;
 	}
 
-	int j=0;
-	for (int i=BIOZAP_Sample_Lgth; i < BIOZAP_SAMPLE_SIZE; i++ ){
-		sample_array [i] = sample_array [j++];
-	}
-
 return 1;
 
 }
@@ -148,68 +142,48 @@ return 1;
 
 }
 
-// period = sys_clock/prescaler/freq/samlenumber
-// prescaler 1..65536
+// arr = sys_clock/prescaler/freq/samlenumber
 
-static freq_item find_time_freq(TIM_HandleTypeDef *htim, double freq)
+uint16_t min_Sample(uint32_t freq)
+{
+	if(freq < 1000)
+		return 128;
+	else
+		return 50;
+}
+
+static freq_item find_time_freq(TIM_HandleTypeDef *htim, uint32_t freq)
 {
 	double TOLERANCE = 0.001;
+	freq /= 100;
 	uint32_t CLOCK_MCU = HAL_RCC_GetSysClockFreq(); //
 	freq_item element;
    	element.psc = 1;
    	element.arr = 1;
 	element.error = 100.0;
-	element.freq = 0.0;
-	element.gcd = 0;
+	element.freq = 0;
+	uint32_t clk = CLOCK_MCU / freq;
 	do{
-		for (uint16_t psc = 1; psc < 0xFFFF; psc++){
-			double arr = CLOCK_MCU / (freq * psc);
-			double error = abs(((uint16_t)arr - arr)/(uint16_t)arr);
-			if( (error < TOLERANCE) && ((uint16_t)arr > 0) && ((uint16_t)arr <= 0xFFFF) && (__gcd(psc, (uint16_t)arr) > element.gcd) ){
+		for (uint16_t psc = min_Sample(freq); psc < BIOZAP_SAMPLE_SIZE; psc++ ){
+			double arr = clk / psc;
+			uint16_t intarr = (uint16_t)arr;
+			double error = abs((intarr - arr)/intarr);
+			if( (error < TOLERANCE) && (error < element.error ) && (intarr > 12) && (intarr <= 0xFFFF) ){
 				element.psc = psc;
-				element.arr = (uint16_t)arr;
+				element.arr = intarr;
 				element.error= error;
-				element.freq = CLOCK_MCU / psc / (uint16_t)arr;
-				element.gcd = __gcd(element.psc, element.arr);
+				element.freq = CLOCK_MCU / psc / element.arr;
 			}
 		}
 		TOLERANCE *= 10;
-	}while((element.error > 1) && (element.gcd <= 1) && (element.arr*element.psc > 12));
+	}while((element.error > 1) && (TOLERANCE < 100));
 
-/*
-   	if (element.arr == 1){  // Sometimes psc=xxx and arr=1 combination not working on DAC, but working if exchanged.
-   		element.arr = element.psc;
-   		element.psc = 1;
-   	}
-*/
-   	if ((element.psc < element.arr) && (element.arr < BIOZAP_SAMPLE_SIZE) ){
-   		uint16_t save_arr = element.arr;
-   		element.arr = element.psc;
-   		element.psc = save_arr;
-   	}
-
-   	if (element.psc*element.gcd < BIOZAP_SAMPLE_SIZE ){
-   		element.arr = element.arr/element.gcd;
-   		element.psc = element.psc*element.gcd;
-   	}
-
-// TODO psc 1 jön, Arr < 12 jön.
-// 50 < psc < BIOZAP_SAMPLE_SIZE
-// 10..12 < arr < FFFF
-// Ezt az összes ellenőrzést a while elé kellene berakni.
-// psc páratlan legyen.
-
-   	if (element.psc > BIOZAP_SAMPLE_SIZE ){
-   		element.arr = element.arr*element.gcd;
-   		element.psc = element.psc/element.gcd;
-   		if (element.psc > BIOZAP_SAMPLE_SIZE )
-   			element.error = 2;
-   	}
-/*
-	if (element.arr*element.psc <= 12) { // DMA underrun !!!!!!
-		element.error = 1;
+	if(element.arr > element.psc && element.arr > 50 && element.arr < BIOZAP_SAMPLE_SIZE){
+		uint16_t save = element.arr;
+		element.arr = element.psc;
+		element.psc = save;
 	}
-*/
+
 	return element;
 }
 

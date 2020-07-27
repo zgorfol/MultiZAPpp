@@ -63,8 +63,10 @@ MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 64K
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 256K-2K
-DATA (rw) 		: ORIGIN = 0x0803F800, LENGTH = 2K
+DATA (rw) 		: ORIGIN = 0x803F800, LENGTH = 2K		
 }
+/* If changing the DATA size parameters you have to in biozap_prog.h too !!! */
+
 
 /* Define output sections */
 SECTIONS
