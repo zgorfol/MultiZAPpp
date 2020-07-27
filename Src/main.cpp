@@ -245,9 +245,9 @@ void findAndReplaceAll(std::string & data, std::string toSearch, std::string rep
 }
 
 void Delay(uint16_t Del_Time){
-	uint16_t i = 0;
-	while(i++ <= Del_Time) {
-		HAL_Delay(1);
+	uint32_t delay_end = HAL_GetTick() + Del_Time;
+	while(HAL_GetTick() < delay_end) {
+		HAL_Delay(10);
 		if(abort_Prog_Run)
 			return;
 	}
