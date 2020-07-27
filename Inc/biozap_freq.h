@@ -10,9 +10,6 @@
 
 
 #include <cmath>
-#include <algorithm>
-
-using namespace std;
 
 #define PI 3.14159265
 #define BIOZAP_SAMPLE_SIZE 1024	// 12bit sample (0-4095) size

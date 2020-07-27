@@ -27,6 +27,7 @@
 #include <string>
 #include <cstring>
 #include <sstream>
+#include <functional>
 
 using namespace std;
 
@@ -83,17 +84,22 @@ struct paramstruc{
 
 };
 
-string EOL = "\r\n";
-char LF = '\n';
-
-volatile bool com_arrived = false;
-string welcome_str = EOL+"Hello World !!!"+EOL+">";
-string tx_buffer = "";
-volatile bool uart_TX_busy = false;
+volatile bool command1_arrived = false;
+volatile bool command2_arrived = false;
+volatile bool uart1_TX_busy = false;
+volatile bool uart2_TX_busy = false;
 volatile bool abort_Prog_Run = false;// Abort Command Interpreter running
-uint8_t rx_data; 			// Serial receive char
-string rx_buffer = ""; 		// Serial receive buffer
-string command_Line = ""; 	// arrived command line
+uint8_t rx1_data; 			// Serial receive char
+uint8_t rx2_data; 			// Serial receive char
+char LF = '\n';
+string EOL = "\r\n";
+string welcome_str = EOL+"Hello World !!!"+EOL+">";
+string tx1_buffer = "";
+string rx1_buffer = ""; 		// Serial receive buffer
+string tx2_buffer = "";
+string rx2_buffer = ""; 		// Serial receive buffer
+string command1_Line = ""; 	// arrived command line
+string command2_Line = ""; 	// arrived command line
 string user_Program = "";	// Store user program
 
 void read_flash(string *data)
@@ -152,42 +158,71 @@ void save_to_flash(const program data)
 	  HAL_FLASH_Lock();
 }
 
-void uart_TX_IT(string inputString){
-	while (uart_TX_busy){ // Wait empty TX buffer
+void uart1_TX_IT(string inputString){
+	while (uart1_TX_busy){ // Wait empty TX buffer
 		;
 	}
-	tx_buffer = "";
-	tx_buffer += inputString;
-	HAL_UART_Transmit_IT(&huart2, (uint8_t *) tx_buffer.c_str(), tx_buffer.length());
-	uart_TX_busy = true;
+	tx1_buffer = "";
+	tx1_buffer += inputString;
+	HAL_UART_Transmit_IT(&huart1, (uint8_t *) tx1_buffer.c_str(), tx1_buffer.length());
+	uart1_TX_busy = true;
+}
+
+void uart2_TX_IT(string inputString){
+	while (uart2_TX_busy){ // Wait empty TX buffer
+		;
+	}
+	tx2_buffer = "";
+	tx2_buffer += inputString;
+	HAL_UART_Transmit_IT(&huart2, (uint8_t *) tx2_buffer.c_str(), tx2_buffer.length());
+	uart2_TX_busy = true;
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
+	if (huart->Instance == USART1) {
+		uart1_TX_busy = false;
+	}
 	if (huart->Instance == USART2) {
-		uart_TX_busy = false;
+		uart2_TX_busy = false;
 	}
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-	if (huart->Instance == USART2) {
-		if(EOL.find(rx_data) != std::string::npos){ // CR or LF
-			if(rx_buffer.length() > 0){
-				command_Line = "";
-				command_Line += rx_buffer+EOL;
-				rx_buffer = "";
-				abort_Prog_Run = command_Line == "abort\r\n";
+	if (huart->Instance == USART1) {
+		if(EOL.find(rx1_data) != std::string::npos){ // CR or LF
+			if(rx1_buffer.length() > 0){
+				command1_Line = "";
+				command1_Line += rx1_buffer+EOL;
+				rx1_buffer = "";
+				abort_Prog_Run = command1_Line == "abort"+EOL;
 				if (abort_Prog_Run)
-					command_Line = "";
-				else
-					com_arrived = true;  // Start Command Interpreter
+					command1_Line = "beep 500"+EOL;
+				command1_arrived = true;  // Start Command Interpreter
 			}
 		}
 		else {
-			rx_buffer += rx_data;
+			rx1_buffer += rx1_data;
 		}
-		HAL_UART_Receive_IT(&huart2,&rx_data, 1);
+		HAL_UART_Receive_IT(&huart1,&rx1_data, 1);
+	}
+	if (huart->Instance == USART2) {
+		if(EOL.find(rx2_data) != std::string::npos){ // CR or LF
+			if(rx2_buffer.length() > 0){
+				command2_Line = "";
+				command2_Line += rx2_buffer+EOL;
+				rx2_buffer = "";
+				abort_Prog_Run = command2_Line == "abort"+EOL;
+				if (abort_Prog_Run)
+					command2_Line = "beep 500"+EOL;
+				command2_arrived = true;  // Start Command Interpreter
+			}
+		}
+		else {
+			rx2_buffer += rx2_data;
+		}
+		HAL_UART_Receive_IT(&huart2,&rx2_data, 1);
 	}
 }
 
@@ -202,7 +237,7 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac)
 void start_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim, uint16_t psc, uint16_t arr)
 {
 	BIOZAP_Sample_Lgth = min(psc,(uint16_t)BIOZAP_SAMPLE_SIZE);
-	generate_sample(0, 4095, BIOZAP_SIN, BIOZAP_SampleArray);
+	generate_sample(0, 1100, BIOZAP_SIN, BIOZAP_SampleArray);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)BIOZAP_SampleArray, BIOZAP_Sample_Lgth, DAC_ALIGN_12B_R);
 	HAL_TIM_Base_Start(&htim6);
 	__HAL_TIM_SET_AUTORELOAD(htim, arr);
@@ -215,7 +250,7 @@ void stop_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim)
 }
 
 
-void getParams(string inputString, paramstruc* param){
+void getParams(string inputString, paramstruc* param, std::function<void (string)> uart_TX_IT){
 	int j = 0;
 	for (int i = 0; i < MAX_CMD_PARAMS; i++)
 			param->param[i] = "";
@@ -244,7 +279,7 @@ void findAndReplaceAll(std::string & data, std::string toSearch, std::string rep
 	}
 }
 
-void Delay(uint16_t Del_Time){
+void Delay(uint32_t Del_Time){
 	uint32_t delay_end = HAL_GetTick() + Del_Time;
 	while(HAL_GetTick() < delay_end) {
 		HAL_Delay(10);
@@ -253,17 +288,14 @@ void Delay(uint16_t Del_Time){
 	}
 }
 
-void send_prg_to_uart(string inp_Str){
-	findAndReplaceAll(inp_Str, "\r", "");	// Delete all CR in the inp_Str
-	findAndReplaceAll(inp_Str, "\n", EOL);	// Change all LF to EOL in the inp_Str
-	uart_TX_IT(inp_Str);
+void beep(uint32_t delay_time){
+	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
+	Delay(delay_time);
+	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
 }
 
-void send_ok_to_uart(){
-	uart_TX_IT("Ok."+EOL);
-}
 
-void Command_Interpreter(string comm_Str)
+void Command_Interpreter(string comm_Str, std::function<void (string)> uart_TX_IT)
 {
 	paramstruc param;
 	size_t from = 0;
@@ -275,8 +307,10 @@ void Command_Interpreter(string comm_Str)
 	while( (to = comm_Str.find(LF, from)+1) >= from ) {  // Get a Command String with LF ending.
 		string one_Str = comm_Str.substr(from, to-from); // from a string or a program.
 		from = to;
-		getParams(one_Str, &param); // set param[x]'s.
-		send_prg_to_uart(one_Str);  // send to uart
+		getParams(one_Str, &param, uart_TX_IT); // set param[x]'s.
+		findAndReplaceAll(one_Str, "\r", "");	// Delete all CR in the inp_Str
+		findAndReplaceAll(one_Str, "\n", EOL);	// Change all LF to EOL in the inp_Str
+		uart_TX_IT(one_Str);
 		if (abort_Prog_Run) {
 			uart_TX_IT("Aborting !"+EOL);
 			abort_Prog_Run = false;
@@ -293,7 +327,7 @@ void Command_Interpreter(string comm_Str)
 				uart_TX_IT("freq:" + to_string(element.freq) + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr-1) + " working ...  ");
 				Delay(std::stol(param.param[2])*1000);
 				stop_DMA(&hdac1, DAC_CHANNEL_1, &htim6);
-				send_ok_to_uart();
+				uart_TX_IT("Ok."+EOL);
 			}
 			else{
 				uart_TX_IT("freq error :"+to_string((int) element.error)+EOL);
@@ -302,34 +336,36 @@ void Command_Interpreter(string comm_Str)
 		else if (param.param[0] == "exe") {
 			int e_idx = std::stoi(param.param[1]);
 			if (e_idx > 0 && e_idx < 10) {
-				Command_Interpreter(internalProgram[e_idx].item);
+				Command_Interpreter(internalProgram[e_idx].item, uart_TX_IT);
 			}
 			else if (e_idx == 0) {
-				Command_Interpreter(user_Program);
+				Command_Interpreter(user_Program, uart_TX_IT);
 			}
 			else {
 				uart_TX_IT("Param[1] error ->"+param.param[1]+"<-"+EOL);
 			}
 		}
 		else if (param.param[0] == "ls") {
-			send_prg_to_uart(user_Program);
+			findAndReplaceAll(user_Program, "\r", "");	// Delete all CR in the inp_Str
+			findAndReplaceAll(user_Program, "\n", EOL);	// Change all LF to EOL in the inp_Str
+			uart_TX_IT(user_Program);
 		}
-		else if (param.param[0] == "mem") { //
-			send_ok_to_uart();
+		else if (param.param[0] == "mem") {
+			uart_TX_IT("Ok."+EOL);
 		}
 		else if (param.param[0] == "wait") {
-			uint32_t delay = std::stol(param.param[1]);
-			Delay(delay);
-			send_ok_to_uart();
+			Delay(std::stol(param.param[1]));
+			uart_TX_IT("Ok."+EOL);
 		}
-		else if (param.param[0] == "off") { //
-			send_ok_to_uart();
+		else if (param.param[0] == "off") {
+			uart_TX_IT("Ok."+EOL);
 		}
-		else if (param.param[0] == "beep") { //
-			send_ok_to_uart();
+		else if (param.param[0] == "beep") {
+			beep(std::stol(param.param[1]));
+			uart_TX_IT("Ok."+EOL);
 		}
-		else if (param.param[0] == "pbar") { //
-			send_ok_to_uart();
+		else if (param.param[0] == "pbar") {
+			uart_TX_IT("Ok."+EOL);
 		}
 		else if (param.param[0].at(0) == '#') { // comment
 			;
@@ -344,7 +380,6 @@ void Command_Interpreter(string comm_Str)
 	if (param.param[0] != "exe")  // exe command recursive call this function
 		uart_TX_IT(">");
 }
-
 /* USER CODE END 0 */
 
 /**
@@ -381,9 +416,10 @@ int main(void)
   MX_TIM6_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
-  uart_TX_IT(welcome_str);  // Welcome string to Serial
-  HAL_UART_Receive_IT(&huart2, &rx_data, 1);  // Serial receive starting.
+  uart1_TX_IT(welcome_str);  // Welcome string to Serial1
+  uart2_TX_IT(welcome_str);  // Welcome string to Serial2
+  HAL_UART_Receive_IT(&huart1, &rx1_data, 1);  // Serial1 receive starting.
+  HAL_UART_Receive_IT(&huart2, &rx2_data, 1);  // Serial2 receive starting.
 
 /*
     const program userProgram = {
@@ -397,7 +433,6 @@ int main(void)
     save_to_flash(userProgram); // If userProgram too big change the DATA location, now 2k the size !!!
 */
   read_flash(&user_Program);
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -407,12 +442,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-//	HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-//	Delay(1500);
-  	if (com_arrived ) {
-  		com_arrived = false;
-	  	Command_Interpreter(command_Line);
-  	}
+//	  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+//	  Delay(1500);
+	  if (command1_arrived ) {
+		  command1_arrived = false;
+	  	  Command_Interpreter(command1_Line, uart1_TX_IT);
+	  }
+	  if (command2_arrived ) {
+		  command2_arrived = false;
+	  	  Command_Interpreter(command2_Line, uart2_TX_IT);
+	  }
   }
   /* USER CODE END 3 */
 }
@@ -531,7 +570,7 @@ static void MX_TIM6_Init(void)
 
   /* USER CODE END TIM6_Init 1 */
   htim6.Instance = TIM6;
-  htim6.Init.Prescaler = 0;
+  htim6.Init.Prescaler = 32-1;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim6.Init.Period = 100-1;
   htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
@@ -651,14 +690,14 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, LD3_Pin|Beep_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : LD3_Pin */
-  GPIO_InitStruct.Pin = LD3_Pin;
+  /*Configure GPIO pins : LD3_Pin Beep_Pin */
+  GPIO_InitStruct.Pin = LD3_Pin|Beep_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(LD3_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 

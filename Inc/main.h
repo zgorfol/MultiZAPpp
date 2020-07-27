@@ -64,6 +64,8 @@ void Error_Handler(void);
 #define USART2_RX_GPIO_Port GPIOA
 #define LD3_Pin GPIO_PIN_3
 #define LD3_GPIO_Port GPIOB
+#define Beep_Pin GPIO_PIN_7
+#define Beep_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
