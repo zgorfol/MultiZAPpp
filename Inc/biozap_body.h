@@ -135,7 +135,7 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac)
 void start_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim, uint16_t psc, uint16_t arr)
 {
 	BIOZAP_Sample_Lgth = min(psc,(uint16_t)BIOZAP_SAMPLE_SIZE);
-	generate_sample(0, 1100, BIOZAP_SIN, BIOZAP_SampleArray);
+	generate_sample(vmin, vout-vmin, BIOZAP_SIN, BIOZAP_SampleArray);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)BIOZAP_SampleArray, BIOZAP_Sample_Lgth, DAC_ALIGN_12B_R);
 	HAL_TIM_Base_Start(&htim6);
 	__HAL_TIM_SET_AUTORELOAD(htim, arr);
@@ -263,6 +263,18 @@ void Command_Interpreter(string comm_Str, std::function<void (string)> uart_TX_I
 				param.param[1] = "100";
 			beep(std::stol(param.param[1]));
 			uart_TX_IT("Ok."+EOL);
+		}
+		else if (param.param[0] == "vout") {
+			if (param.param[1] == "")
+				param.param[1] = to_string(vout);
+			vout = std::stol(param.param[1]);
+			uart_TX_IT(param.param[1]+EOL+"Ok."+EOL);
+		}
+		else if (param.param[0] == "vmin") {
+			if (param.param[1] == "")
+				param.param[1] = to_string(vmin);
+			vmin = std::stol(param.param[1]);
+			uart_TX_IT(param.param[1]+EOL+"Ok."+EOL);
 		}
 		else if (param.param[0] == "pbar") {
 			uart_TX_IT("Ok."+EOL);

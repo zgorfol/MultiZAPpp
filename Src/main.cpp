@@ -101,6 +101,9 @@ string command1_Line = ""; 	// arrived command line
 string command2_Line = ""; 	// arrived command line
 string user_Program = "";	// Store user program
 
+uint16_t vout = 1200;
+uint16_t vmin =    0;
+
 uint8_t key = '\0';
 string lcd_msg = "multiZAP++";
 
