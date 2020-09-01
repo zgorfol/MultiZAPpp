@@ -22,6 +22,7 @@
 
 #define LCD_DELAY_MS 5
 
+bool is_I2C = false;
 void I2C_Scan(void);
 void LCD_Init(uint8_t lcd_addr);
 void LCD_SendCommand(uint8_t lcd_addr, uint8_t cmd);
@@ -41,6 +42,7 @@ void I2C_Scan() {
         	ss << hex << (int)( i );
         	ss >> msg;
             uart2_TX_IT(" 0x" + msg + " ");
+            is_I2C  = true;
         } else {
         	uart2_TX_IT(".");
         }
@@ -51,6 +53,9 @@ void I2C_Scan() {
 
 HAL_StatusTypeDef LCD_SendInternal(uint8_t lcd_addr, uint8_t data, uint8_t flags) {
     HAL_StatusTypeDef res;
+    if(!is_I2C) {
+    	return HAL_ERROR;
+    }
     for(;;) {
         res = HAL_I2C_IsDeviceReady(&hi2c3, lcd_addr, 1, HAL_MAX_DELAY);
         if(res == HAL_OK)

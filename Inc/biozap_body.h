@@ -1,4 +1,5 @@
-
+#ifndef BIOZAP_BODY_H_
+#define BIOZAP_BODY_H_
 
 void read_flash(string *data)
 {
@@ -138,6 +139,7 @@ void start_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim
 	generate_sample(vmin, vout-vmin, BIOZAP_SIN, BIOZAP_SampleArray);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1, (uint32_t*)BIOZAP_SampleArray, BIOZAP_Sample_Lgth, DAC_ALIGN_12B_R);
 	HAL_TIM_Base_Start(&htim6);
+	__HAL_TIM_SET_PRESCALER(htim, 0);
 	__HAL_TIM_SET_AUTORELOAD(htim, arr);
 }
 
@@ -147,6 +149,15 @@ void stop_DMA(DAC_HandleTypeDef *hdac, uint32_t Channel,TIM_HandleTypeDef *htim)
 	HAL_TIM_Base_Stop(&htim6);
 }
 
+
+void Delay(uint32_t Del_Time){
+	uint32_t delay_end = HAL_GetTick() + Del_Time;
+	while(HAL_GetTick() < delay_end) {
+		HAL_Delay(1);
+		if(abort_Prog_Run)
+			return;
+	}
+}
 
 void getParams(string inputString, paramstruc* param, std::function<void (string)> uart_TX_IT){
 	int j = 0;
@@ -177,6 +188,7 @@ void findAndReplaceAll(std::string & data, std::string toSearch, std::string rep
 	}
 }
 
+/*
 void Delay(uint32_t Del_Time){
 	uint32_t delay_end = HAL_GetTick() + Del_Time;
 	while(HAL_GetTick() < delay_end) {
@@ -185,13 +197,13 @@ void Delay(uint32_t Del_Time){
 			return;
 	}
 }
+*/
 
 void beep(uint32_t delay_time){
 	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
 	Delay(delay_time);
 	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
 }
-
 
 void Command_Interpreter(string comm_Str, std::function<void (string)> uart_TX_IT)
 {
@@ -210,7 +222,7 @@ void Command_Interpreter(string comm_Str, std::function<void (string)> uart_TX_I
 		findAndReplaceAll(one_Str, "\n", EOL);	// Change all LF to EOL in the inp_Str
 		uart_TX_IT(one_Str);
 		if (abort_Prog_Run) {
-			uart_TX_IT("Aborting !"+EOL);
+			uart_TX_IT("Aborting !"+EOL+">");
 			abort_Prog_Run = false;
 			return;
 		}
@@ -218,11 +230,14 @@ void Command_Interpreter(string comm_Str, std::function<void (string)> uart_TX_I
 			uart_TX_IT("empty command !"+EOL);
 		}
 		else if (param.param[0] == "freq") {
-			uint32_t freq = std::stod(param.param[1]);
+			double freq = std::stod(param.param[1]);
 			freq_item element = find_time_freq(&htim6, freq);
 			if(element.error < 1.0){
 				start_DMA(&hdac1, DAC_CHANNEL_1, &htim6, element.psc - 1, element.arr - 1);
-				uart_TX_IT("freq:" + to_string(element.freq) + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr-1) + " working ...  ");
+
+				string numstr = to_string((uint32_t)element.freq);
+				string precstr = to_string((uint32_t)((element.freq-(uint32_t)element.freq)*100));
+				uart_TX_IT("freq:" + numstr + "." + precstr + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr-1) + " working ...  ");
 				Delay(std::stol(param.param[2])*1000);
 				stop_DMA(&hdac1, DAC_CHANNEL_1, &htim6);
 				uart_TX_IT("Ok."+EOL);
@@ -294,4 +309,5 @@ void Command_Interpreter(string comm_Str, std::function<void (string)> uart_TX_I
 }
 
 
+#endif
 

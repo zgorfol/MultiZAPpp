@@ -23,7 +23,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include <iostream>
 #include <string>
 #include <cstring>
 #include <sstream>
@@ -53,6 +52,7 @@ DMA_HandleTypeDef hdma_dac_ch1;
 I2C_HandleTypeDef hi2c3;
 
 TIM_HandleTypeDef htim6;
+TIM_HandleTypeDef htim7;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
@@ -70,6 +70,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM6_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C3_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -104,14 +105,14 @@ string user_Program = "";	// Store user program
 uint16_t vout = 1200;
 uint16_t vmin =    0;
 
-uint8_t key = '\0';
 string lcd_msg = "multiZAP++";
 
 #include "biozap_freq.h"
+#include "keypad.h"
 #include "biozap_prog.h"
 #include "biozap_body.h"
 #include "i2c_lcd.h"
-#include "keypad.h"
+
 /* USER CODE END 0 */
 
 /**
@@ -148,6 +149,7 @@ int main(void)
   MX_TIM6_Init();
   MX_USART1_UART_Init();
   MX_I2C3_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   uart1_TX_IT(welcome_str);  // Welcome string to Serial1
   uart2_TX_IT(welcome_str);  // Welcome string to Serial2
@@ -168,7 +170,7 @@ int main(void)
   read_flash(&user_Program);
 
   init_LCD();
-  //Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins,(GPIO_TypeDef *) rowPorts,(GPIO_TypeDef *) colPorts, ROWS, COLS );
+  init_Keypad(Keypad_withIT); // Keypad with interrupt routines
 
   /* USER CODE END 2 */
 
@@ -188,15 +190,16 @@ int main(void)
     	  	  Command_Interpreter(command2_Line, uart2_TX_IT);
     	  }
 
-      key = KeypadGetKey();
-  	  if (key != KEYPAD_NO_PRESSED) {
+      uint8_t actKey = 	KeypadGetKey(Keypad_withIT);
+  	  if (actKey != KEYPAD_NO_PRESSED) {
   	  	  LCD_SendCommand(LCD_ADDR, 0b11000000);
   	  	  string keystr = "";
-  	  	  keystr += key;
+  	  	  keystr += actKey;
   		  LCD_SendString(LCD_ADDR, keystr);
 
   		  uart2_TX_IT(keystr+EOL+">");
   	  }
+
 
   }
   /* USER CODE END 3 */
@@ -385,6 +388,44 @@ static void MX_TIM6_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 80-1;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 20000-1;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -484,22 +525,20 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, D3_Pin|D6_Pin|D5_Pin|D4_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, D3_Pin|D6_Pin|Beep_Pin|D5_Pin 
+                          |D4_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : D3_Pin D6_Pin D5_Pin D4_Pin */
   GPIO_InitStruct.Pin = D3_Pin|D6_Pin|D5_Pin|D4_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : D9_Pin D10_Pin D2_Pin */
   GPIO_InitStruct.Pin = D9_Pin|D10_Pin|D2_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : Beep_Pin */
@@ -511,8 +550,8 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : D11_Pin */
   GPIO_InitStruct.Pin = D11_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(D11_GPIO_Port, &GPIO_InitStruct);
 
   /**/

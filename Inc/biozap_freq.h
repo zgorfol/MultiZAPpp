@@ -12,7 +12,7 @@
 #include <cmath>
 
 #define PI 3.14159265
-#define BIOZAP_SAMPLE_SIZE 1024	// 12bit sample (0-4095) size
+#define BIOZAP_SAMPLE_SIZE 2048	// 12bit sample (0-4095) size
 #define BIOZAP_ONE_VOLT 349.24  	// Divider 12k/4.7k with AD811 OpAmp equals 1V = 349.24 bits  or 1bit = 0.0028634V
 #define BIOZAP_VMIN_MAX 400			//  4.00 V
 #define BIOZAP_VMAX_MAX 1100		// 11.00 V
@@ -34,13 +34,13 @@ struct freq_item{
 	uint16_t psc;
 	uint16_t arr;
 	double error;
-	uint32_t freq;
+	double freq;
 };
 
 static uint8_t generate_sin_sample (uint16_t v_min, uint16_t v_max, uint16_t *sample_array);
 static uint8_t generate_saw_sample (uint16_t v_min, uint16_t v_max, uint16_t *sample_array);
 static uint8_t generate_rec_sample (uint16_t v_min, uint16_t v_max, uint16_t *sample_array);
-static freq_item find_time_freq(TIM_HandleTypeDef *htim, uint32_t freq);
+static freq_item find_time_freq(TIM_HandleTypeDef *htim, double freq);
 void set_time_freq(TIM_HandleTypeDef *htim, uint16_t psc, uint16_t arr);
 
 
@@ -144,22 +144,21 @@ return 1;
 uint16_t min_Sample(uint32_t freq)
 {
 	if(freq < 1000)
-		return 128;
+		return 50; //128
 	else
 		return 50;
 }
 
-static freq_item find_time_freq(TIM_HandleTypeDef *htim, uint32_t freq)
+static freq_item find_time_freq(TIM_HandleTypeDef *htim, double freq)
 {
-	double TOLERANCE = 0.001;
-	freq /= 100;
-	uint32_t CLOCK_MCU = HAL_RCC_GetSysClockFreq(); //
 	freq_item element;
    	element.psc = 1;
    	element.arr = 1;
 	element.error = 100.0;
 	element.freq = 0;
-	uint32_t clk = CLOCK_MCU / freq;
+	double TOLERANCE = 0.001;
+	double CLOCK_MCU = HAL_RCC_GetSysClockFreq(); //
+	double clk = CLOCK_MCU / (freq/100);
 	do{
 		for (uint16_t psc = min_Sample(freq); psc < BIOZAP_SAMPLE_SIZE; psc++ ){
 			double arr = clk / psc;
@@ -169,7 +168,6 @@ static freq_item find_time_freq(TIM_HandleTypeDef *htim, uint32_t freq)
 				element.psc = psc;
 				element.arr = intarr;
 				element.error= error;
-				element.freq = CLOCK_MCU / psc / element.arr;
 			}
 		}
 		TOLERANCE *= 10;
@@ -181,9 +179,10 @@ static freq_item find_time_freq(TIM_HandleTypeDef *htim, uint32_t freq)
 		element.psc = save;
 	}
 
+	element.freq = CLOCK_MCU / element.psc / element.arr;
 	return element;
 }
 
 
-
 #endif /* BIOZAP_FREQ_H_ */
+
