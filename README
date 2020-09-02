@@ -1,1 +1,27 @@
-MultiZAP++ teszt version 1.0
+MultiZAP++ teszt version 1.1
+
+STM32L432KC  
+	SB5, SB7 OPEN
+	SB6, SB8 CLOSE
+	
+PINS:
+	Keypad: 
+		Cols: D3, D4, D5, D6
+		Rows:D7, D8, D9, D10
+
+Beep:
+	D2
+
+Bluetooth:
+	RX/TX D1, D2
+	+ 5V
+	GND
+
+LCD:
+	SDA: D12
+	SDL: A6
+	+5V
+	GND
+
+DAC out:
+	A3 

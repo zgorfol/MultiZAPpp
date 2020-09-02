@@ -29,17 +29,17 @@ extern "C" {
 
 // Configure GPIO as input with pull-down resistor for keypad rows
 // You have to edit stm32..it.c to write EXTI... handlers
-#define KEYPAD_GPIO_ROW0			D11_GPIO_Port
-#define KEYPAD_PIN_ROW0				D11_Pin
-#define KEYPAD_PIN_ROW0_EXTI	EXTI9_5_IRQn
-#define KEYPAD_GPIO_ROW1			D10_GPIO_Port
-#define KEYPAD_PIN_ROW1				D10_Pin
-#define KEYPAD_PIN_ROW1_EXTI	EXTI15_10_IRQn
-#define KEYPAD_GPIO_ROW2			D9_GPIO_Port
-#define KEYPAD_PIN_ROW2				D9_Pin
-#define KEYPAD_PIN_ROW2_EXTI	EXTI9_5_IRQn
-#define KEYPAD_GPIO_ROW3			D2_GPIO_Port
-#define KEYPAD_PIN_ROW3				D2_Pin
+#define KEYPAD_GPIO_ROW0			D10_GPIO_Port
+#define KEYPAD_PIN_ROW0				D10_Pin
+#define KEYPAD_PIN_ROW0_EXTI	EXTI15_10_IRQn
+#define KEYPAD_GPIO_ROW1			D9_GPIO_Port
+#define KEYPAD_PIN_ROW1				D9_Pin
+#define KEYPAD_PIN_ROW1_EXTI	EXTI9_5_IRQn
+#define KEYPAD_GPIO_ROW2			D8_GPIO_Port
+#define KEYPAD_PIN_ROW2				D8_Pin
+#define KEYPAD_PIN_ROW2_EXTI	EXTI15_10_IRQn
+#define KEYPAD_GPIO_ROW3			D7_GPIO_Port
+#define KEYPAD_PIN_ROW3				D7_Pin
 #define KEYPAD_PIN_ROW3_EXTI	EXTI15_10_IRQn
 
 #define KEYPAD_NO_PRESSED			0x00
@@ -117,7 +117,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if (GPIO_Pin == D11_Pin) {
+	if (GPIO_Pin == D10_Pin) {
 		   switch (Tim7_Col_Idx) {
 		   	   case 0:
 		   		   key = '1';
@@ -133,7 +133,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		   		   break;
 		   }
 	}
-	if (GPIO_Pin == D10_Pin) {
+	if (GPIO_Pin == D9_Pin) {
 		   switch (Tim7_Col_Idx) {
 		   	   case 0:
 		   		   key = '4';
@@ -149,7 +149,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		   		   break;
 		   }
 	}
-	if (GPIO_Pin == D9_Pin) {
+	if (GPIO_Pin == D8_Pin) {
 		   switch (Tim7_Col_Idx) {
 		   	   case 0:
 		   		   key = '7';
@@ -165,7 +165,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		   		   break;
 		   }
 	}
-	if (GPIO_Pin == D2_Pin) {
+	if (GPIO_Pin == D7_Pin) {
 		   switch (Tim7_Col_Idx) {
 		   	   case 0:
 		   		   key = '*';

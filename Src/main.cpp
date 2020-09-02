@@ -170,7 +170,7 @@ int main(void)
   read_flash(&user_Program);
 
   init_LCD();
-  init_Keypad(Keypad_withIT); // Keypad with interrupt routines
+  init_Keypad(Keypad_withIT); // Keypad init with interrupt routines or polling
 
   /* USER CODE END 2 */
 
@@ -190,7 +190,7 @@ int main(void)
     	  	  Command_Interpreter(command2_Line, uart2_TX_IT);
     	  }
 
-      uint8_t actKey = 	KeypadGetKey(Keypad_withIT);
+      uint8_t actKey = 	KeypadGetKey(Keypad_withIT); // Get key with interrupt or with polling
   	  if (actKey != KEYPAD_NO_PRESSED) {
   	  	  LCD_SendCommand(LCD_ADDR, 0b11000000);
   	  	  string keystr = "";
@@ -521,22 +521,31 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, D3_Pin|D6_Pin|Beep_Pin|D5_Pin 
-                          |D4_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, D3_Pin|D6_Pin|D5_Pin|D4_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : D7_Pin D8_Pin */
+  GPIO_InitStruct.Pin = D7_Pin|D8_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pins : D3_Pin D6_Pin D5_Pin D4_Pin */
   GPIO_InitStruct.Pin = D3_Pin|D6_Pin|D5_Pin|D4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : D9_Pin D10_Pin D2_Pin */
-  GPIO_InitStruct.Pin = D9_Pin|D10_Pin|D2_Pin;
+  /*Configure GPIO pins : D9_Pin D10_Pin */
+  GPIO_InitStruct.Pin = D9_Pin|D10_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -547,18 +556,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(Beep_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : D11_Pin */
-  GPIO_InitStruct.Pin = D11_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(D11_GPIO_Port, &GPIO_InitStruct);
-
-  /**/
-  HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_PB6);
-
-  /**/
-  HAL_I2CEx_EnableFastModePlus(I2C_FASTMODEPLUS_PB7);
 
 }
 

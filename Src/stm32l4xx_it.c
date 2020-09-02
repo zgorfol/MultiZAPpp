@@ -277,12 +277,12 @@ void TIM7_IRQHandler(void)
 void EXTI9_5_IRQHandler(void)
 {
 	HAL_GPIO_EXTI_IRQHandler(D9_Pin);
-	HAL_GPIO_EXTI_IRQHandler(D11_Pin);
 }
 
 void EXTI15_10_IRQHandler(void)
 {
-	HAL_GPIO_EXTI_IRQHandler(D2_Pin);
+	HAL_GPIO_EXTI_IRQHandler(D7_Pin);
+	HAL_GPIO_EXTI_IRQHandler(D8_Pin);
 	HAL_GPIO_EXTI_IRQHandler(D10_Pin);
 }
 /* USER CODE END 1 */
