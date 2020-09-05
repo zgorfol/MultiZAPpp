@@ -13,7 +13,7 @@ Beep:
 	D2
 
 Bluetooth:
-	RX/TX D1, D2
+	RX/TX D1, D0
 	+ 5V
 	GND
 
