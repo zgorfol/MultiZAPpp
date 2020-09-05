@@ -188,17 +188,6 @@ void findAndReplaceAll(std::string & data, std::string toSearch, std::string rep
 	}
 }
 
-/*
-void Delay(uint32_t Del_Time){
-	uint32_t delay_end = HAL_GetTick() + Del_Time;
-	while(HAL_GetTick() < delay_end) {
-		HAL_Delay(1);
-		if(abort_Prog_Run)
-			return;
-	}
-}
-*/
-
 void beep(uint32_t delay_time){
 	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
 	Delay(delay_time);

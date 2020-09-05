@@ -57,7 +57,6 @@ _estack = 0x20010000;    /* end of RAM */
 /* Generate a link error if heap and stack don't fit into RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
-
 /* Specify the memory areas */
 MEMORY
 {
@@ -65,7 +64,9 @@ RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 64K
 FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 256K-2K
 DATA (rw) 		: ORIGIN = 0x803F800, LENGTH = 2K		
 }
-/* If changing the DATA size parameters you have to in biozap_prog.h too !!! */
+/* PageSize 2K  -->  DATA have to 2K multiplicative !!!!!!!!*/
+__userData_start__ = ORIGIN(DATA);
+__Flash_PageSize__ = 0x00000800;
 
 
 /* Define output sections */
@@ -168,7 +169,8 @@ SECTIONS
      *(.user_data)
   	. = ALIGN(8);
   } > DATA
-  
+
+ 
   /* Uninitialized data section */
   . = ALIGN(4);
   .bss :
@@ -206,5 +208,4 @@ SECTIONS
 
   .ARM.attributes 0 : { *(.ARM.attributes) }
 }
-
 
