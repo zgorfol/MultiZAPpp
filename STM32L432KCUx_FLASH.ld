@@ -58,16 +58,18 @@ _estack = 0x20010000;    /* end of RAM */
 _Min_Heap_Size = 0x200;      /* required amount of heap  */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 /* Specify the memory areas */
+__Flash_PageSize__ = 0x00000800;
+__Flash_DataPageNumber__ = 1; 
+/* You can change the PageNumber if the space is not enough, after change a clean build needed */
+__Flash_DataLg = __Flash_PageSize__*__Flash_DataPageNumber__;
 MEMORY
 {
 RAM (xrw)      : ORIGIN = 0x20000000, LENGTH = 64K
-FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 256K-2K
-DATA (rw) 		: ORIGIN = 0x803F800, LENGTH = 2K		
+FLASH (rx)      : ORIGIN = 0x8000000, LENGTH = 256K-__Flash_DataLg
+DATA (rw) 		: ORIGIN = 0x803F800, LENGTH = __Flash_DataLg		
 }
-/* PageSize 2K  -->  DATA have to 2K multiplicative !!!!!!!!*/
-__userData_start__ = ORIGIN(DATA);
-__Flash_PageSize__ = 0x00000800;
 
+__userData_start__ = ORIGIN(DATA);
 
 /* Define output sections */
 SECTIONS

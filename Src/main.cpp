@@ -165,7 +165,7 @@ int main(void)
   		"beep 500\n"
   		"off\n"
     };
-    save_to_flash(userProgram); // If userProgram too big change the DATA,
+    save_to_flash(userProgram); // If userProgram too big change the DATA size,
     														// now 2k the size in the STM32L432KCUx_FLASH.ld !!!
 */
   read_flash(&user_Program);
