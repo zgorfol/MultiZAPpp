@@ -143,14 +143,8 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac)
 }
 
 
-void Delay(UART_HandleTypeDef *huart, uint32_t Del_Time){
-/*	uint32_t delay_end = HAL_GetTick() + Del_Time;
-	while(HAL_GetTick() < delay_end) {
-		HAL_Delay(1);
-		if(abort_Prog_Run)
-			return;
-	}
-*/
+void Delay(UART_HandleTypeDef *huart, uint32_t Del_Time)
+{
 	for(uint16_t idx= Del_Time; idx >0; idx--){
 		HAL_Delay(1000);
 		uart_TX_IT(huart,  to_string(idx)+EOL);
