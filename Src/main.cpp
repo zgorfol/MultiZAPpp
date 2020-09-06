@@ -24,11 +24,13 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string>
-#include <cstring>
-#include <sstream>
-#include <functional>
-
 using namespace std;
+
+#include "keypad.h"
+#include "i2c_lcd.h"
+#include "biozap_comm.h"
+#include "biozap_prog.h"
+#include "biozap_freq.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,7 +60,24 @@ UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+extern string EOL;
+string uart_welcome_str = EOL+"multiZAP++ welcome !"+EOL+">";
+string lcd_msg = "multiZAP++";
+bool Keypad_withIT = true;
 
+extern uint8_t rx_data;
+extern volatile bool command_arrived;
+extern uint8_t rx1_data;
+extern volatile bool command1_arrived;
+
+extern uint32_t __userData_start__; // from the linkerscript
+extern uint32_t __Flash_PageSize__; // from the linkerscript
+extern uint32_t g_pfnVectors[];  // true array (vector table of all ISRs), from the startup assembly .s file
+uint32_t FLASH_START = (uint32_t)&g_pfnVectors[0]; // Get the address of the first element of this array and cast it to a 4-byte unsigned integer
+uint32_t FLASH_STORAGE = (uint32_t)&__userData_start__;
+uint32_t PAGE_SIZE = (uint32_t)& __Flash_PageSize__;
+
+char *eeprom_Data_Chr   = (char*)FLASH_STORAGE;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,41 +96,61 @@ static void MX_TIM7_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-#define MAX_CMD_PARAMS 3
+void read_flash(string *data)
+{
+	volatile uint32_t read_data;
+	volatile uint32_t read_cnt=0;
+	do
+	{
+		read_data = *(uint32_t*)(FLASH_STORAGE + read_cnt);
+		if(read_data != 0xFFFFFFFF)
+		{
+			*data += (char)read_data;
+			*data += (char)(read_data >>  8);
+			*data += (char)(read_data >> 16);
+			*data += (char)(read_data >> 24);
+			read_cnt += 4;
+		}
+	}while((read_data != 0xFFFFFFFF) && (read_cnt < PAGE_SIZE-1));
+	while( (data->length() > 0) && (data->at(data->length()-1) != '\n') ) {
+		data->pop_back();		// Delete any extra char before ending LF
+	}
+}
 
-struct paramstruc{
-    string param[MAX_CMD_PARAMS];
+void save_to_flash(const program data)
+{
+	  volatile uint32_t data_length = (data.item.length() / 8) + (int)((data.item.length() % 8) != 0);
+	  volatile uint64_t data_to_FLASH[data_length];
+	  memset((uint8_t*)data_to_FLASH, 0, sizeof((char*)data_to_FLASH));
+	  strcpy((char*)data_to_FLASH, data.item.c_str());
 
-};
+	  HAL_FLASH_Unlock();
+	  FLASH_EraseInitTypeDef EraseInitStruct;
+	  EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+	  EraseInitStruct.Page = (FLASH_STORAGE-FLASH_START)/PAGE_SIZE;
+	  volatile uint16_t pages = (data.item.length()/PAGE_SIZE) + (int)((data.item.length()%PAGE_SIZE) != 0);
+	  EraseInitStruct.NbPages = pages;
+	  uint32_t PageError;
+	  volatile HAL_StatusTypeDef status;
+	  if(HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK){
+		  Error_Handler();
+		  return;
+	  }
 
-volatile bool command1_arrived = false;
-volatile bool command2_arrived = false;
-volatile bool uart1_TX_busy = false;
-volatile bool uart2_TX_busy = false;
-volatile bool abort_Prog_Run = false;// Abort Command Interpreter running
-uint8_t rx1_data; 			// Serial receive char
-uint8_t rx2_data; 			// Serial receive char
-char LF = '\n';
-string EOL = "\r\n";
-string welcome_str = EOL+"multiZAP++ welcome !"+EOL+">";
-string tx1_buffer = "";
-string rx1_buffer = ""; 		// Serial receive buffer
-string tx2_buffer = "";
-string rx2_buffer = ""; 		// Serial receive buffer
-string command1_Line = ""; 	// arrived command line
-string command2_Line = ""; 	// arrived command line
-string user_Program = "";	// Store user program
-
-uint16_t vout = 1200;
-uint16_t vmin =    0;
-
-string lcd_msg = "multiZAP++";
-
-#include "biozap_freq.h"
-#include "keypad.h"
-#include "biozap_prog.h"
-#include "biozap_body.h"
-#include "i2c_lcd.h"
+	  volatile uint32_t write_cnt=0, index=0;
+	  while(index < data_length) {
+		  status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, FLASH_STORAGE+write_cnt, data_to_FLASH[index]);
+		  if(status == HAL_OK) {
+			  write_cnt += 8;
+			  index++;
+		  }
+		  else {
+			  Error_Handler();
+			  return;
+		  }
+	  }
+	  HAL_FLASH_Lock();
+}
 
 /* USER CODE END 0 */
 
@@ -151,10 +190,10 @@ int main(void)
   MX_I2C3_Init();
   MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
-  uart1_TX_IT(welcome_str);  // Welcome string to Serial1
-  uart2_TX_IT(welcome_str);  // Welcome string to Serial2
-  HAL_UART_Receive_IT(&huart1, &rx1_data, 1);  // Serial1 receive starting.
-  HAL_UART_Receive_IT(&huart2, &rx2_data, 1);  // Serial2 receive starting.
+  uart_TX_IT(&huart2, uart_welcome_str);  // Welcome string to Serial
+  HAL_UART_Receive_IT(&huart2, &rx_data, 1);  // Serial2 receive starting.
+  uart_TX_IT(&huart1, uart_welcome_str);  // Welcome string to Serial
+  HAL_UART_Receive_IT(&huart1, &rx1_data, 1);  // Serial2 receive starting.
 
 /*
     const program userProgram = {
@@ -168,10 +207,11 @@ int main(void)
     save_to_flash(userProgram); // If userProgram too big change the DATA size,
     														// now 2k the size in the STM32L432KCUx_FLASH.ld !!!
 */
+  extern string user_Program;
   read_flash(&user_Program);
 
-  init_LCD();
-  init_Keypad(Keypad_withIT); // Keypad init with interrupt routines or polling
+  init_LCD(&hi2c3, &huart2);
+  init_Keypad(Keypad_withIT, &htim7); // Keypad init with interrupt routines or polling
 
   /* USER CODE END 2 */
 
@@ -182,23 +222,22 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    	  if (command_arrived ) {
+    		  command_arrived = false;
+    		  Cmd_Interpreter(&huart2, &hdac1, &htim6);  // Comm uart2, Signal with hdac1 & htim6
+    	  }
     	  if (command1_arrived ) {
     		  command1_arrived = false;
-    	  	  Command_Interpreter(command1_Line, uart1_TX_IT);
+    		  Cmd_Interpreter(&huart1, &hdac1, &htim6);  // Comm uart2, Signal with hdac1 & htim6
     	  }
-    	  if (command2_arrived ) {
-    		  command2_arrived = false;
-    	  	  Command_Interpreter(command2_Line, uart2_TX_IT);
-    	  }
-
       uint8_t actKey = 	KeypadGetKey(Keypad_withIT); // Get key with interrupt or with polling
   	  if (actKey != KEYPAD_NO_PRESSED) {
-  	  	  LCD_SendCommand(LCD_ADDR, 0b11000000);
+  	  	  LCD_SendCommand(&hi2c3, LCD_ADDR, 0b11000000);
   	  	  string keystr = "";
   	  	  keystr += actKey;
-  		  LCD_SendString(LCD_ADDR, keystr);
+  		  LCD_SendString(&hi2c3, LCD_ADDR, keystr);
 
-  		  uart2_TX_IT(keystr+EOL+">");
+  		  uart_TX_IT(&huart2, keystr+EOL+">");
   	  }
 
 

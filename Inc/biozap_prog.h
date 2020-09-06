@@ -13,17 +13,8 @@
 #ifndef MULTIZAP_PROGRAMS_H_
 #define MULTIZAP_PROGRAMS_H_
 
-extern uint32_t __userData_start__; // from the linkerscript
-extern uint32_t __Flash_PageSize__; // from the linkerscript
-extern uint32_t g_pfnVectors[];  // true array (vector table of all ISRs), from the startup assembly .s file
-uint32_t FLASH_START = (uint32_t)&g_pfnVectors[0]; // Get the address of the first element of this array and cast it to a 4-byte unsigned integer
-uint32_t FLASH_STORAGE = (uint32_t)&__userData_start__;
-uint32_t PAGE_SIZE = (uint32_t)& __Flash_PageSize__;
-
-char *eeprom_Data_Chr   = (char*)FLASH_STORAGE;
-
 struct program{
-    string item;
+    std::string item;
 };
 
 const program internalProgram[] = {
