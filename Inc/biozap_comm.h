@@ -2,7 +2,7 @@
  * biozap_comm.h
  *
  *  Created on: Sep 6, 2020
- *      Author: z_gorfol
+ *      Author: zgorfol
  */
 
 #ifndef BIOZAP_COMM_H_

@@ -2,7 +2,7 @@
  * biozap_comm.cpp
  *
  *  Created on: Sep 6, 2020
- *      Author: z_gorfol
+ *      Author: zgorfol
  */
 
 #include "main.h"
@@ -33,6 +33,7 @@ volatile bool uart_TX1_busy = false;
 volatile bool abort_Prog_Run = false;// Abort Command Interpreter running
 
 char LF = '\n';
+char CR = '\r';
 string EOL = "\r\n";
 
 uint8_t rx_data; 			// Serial receive char
@@ -88,8 +89,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				command_Line += rx_buffer+EOL;
 				rx_buffer = "";
 				abort_Prog_Run = command_Line == "abort"+EOL;
-				if (abort_Prog_Run)
-					command_Line = "beep 500"+EOL;
 				command_arrived = true;  // Start Command Interpreter
 			}
 		}
@@ -105,8 +104,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 				command_Line1 += rx1_buffer+EOL;
 				rx1_buffer = "";
 				abort_Prog_Run = command_Line1 == "abort"+EOL;
-				if (abort_Prog_Run)
-					command_Line1 = "beep 500"+EOL;
 				command1_arrived = true;  // Start Command Interpreter
 			}
 		}
@@ -146,13 +143,21 @@ void HAL_DAC_DMAUnderrunCallbackCh1(DAC_HandleTypeDef *hdac)
 }
 
 
-void Delay(uint32_t Del_Time){
-	uint32_t delay_end = HAL_GetTick() + Del_Time;
+void Delay(UART_HandleTypeDef *huart, uint32_t Del_Time){
+/*	uint32_t delay_end = HAL_GetTick() + Del_Time;
 	while(HAL_GetTick() < delay_end) {
 		HAL_Delay(1);
 		if(abort_Prog_Run)
 			return;
 	}
+*/
+	for(uint16_t idx= Del_Time; idx >0; idx--){
+		HAL_Delay(1000);
+		uart_TX_IT(huart,  to_string(idx)+EOL);
+		if(abort_Prog_Run)
+			return;
+	}
+
 }
 
 void getParams(string inputString, paramstruc* param, UART_HandleTypeDef *huart, std::function<void (UART_HandleTypeDef *, string)> uart_TX_IT){
@@ -186,15 +191,13 @@ void findAndReplaceAll(std::string & data, std::string toSearch, std::string rep
 
 void beep(uint32_t delay_time){
 	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_SET);
-	Delay(delay_time);
+	HAL_Delay(delay_time);
 	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
 }
 
 void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleTypeDef *hdac, TIM_HandleTypeDef *htim, std::function<void (UART_HandleTypeDef *, string)> uart_TX_IT)
 {
 	extern int BIOZAP_Sample_Lgth;
-//	extern uint16_t vout;
-//	extern uint16_t vmin;
 
 	paramstruc param;
 	size_t from = 0;
@@ -213,6 +216,7 @@ void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleT
 		if (abort_Prog_Run) {
 			uart_TX_IT(huart, "Aborting !"+EOL+">");
 			abort_Prog_Run = false;
+			beep(500);
 			return;
 		}
 		else if(param.param[0].length() == 0){  // Have to checked this, later param[0].at(0) chashed an empty string
@@ -226,8 +230,8 @@ void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleT
 
 				string numstr = to_string((uint32_t)element.freq);
 				string precstr = to_string((uint32_t)((element.freq-(uint32_t)element.freq)*100));
-				uart_TX_IT(huart, "freq:" + numstr + "." + precstr + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr-1) + " working ...  ");
-				Delay(std::stol(param.param[2])*1000);
+				uart_TX_IT(huart, "freq:" + numstr + "." + precstr + " Sample:" + to_string(BIOZAP_Sample_Lgth) + " arr:" + to_string(element.arr-1) + " working ...  "+EOL);
+				Delay(huart, std::stol(param.param[2]));
 				stop_DMA(hdac, DAC_CHANNEL_1, htim);
 				uart_TX_IT(huart, "Ok."+EOL);
 			}
@@ -256,7 +260,7 @@ void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleT
 			uart_TX_IT(huart, "Ok."+EOL);
 		}
 		else if (param.param[0] == "wait") {
-			Delay(std::stol(param.param[1]));
+			HAL_Delay(std::stol(param.param[1]));
 			uart_TX_IT(huart, "Ok."+EOL);
 		}
 		else if (param.param[0] == "off") {

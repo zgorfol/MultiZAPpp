@@ -2,7 +2,7 @@
  * i2c_lcd.cpp
  *
  *  Created on: Sep 6, 2020
- *      Author: z_gorfol
+ *      Author: zgorfol
  */
 
 #include <main.h>
