@@ -9,7 +9,6 @@
 #include <string>
 #include <cstring>
 #include <sstream>
-#include <functional>
 
 #include "biozap_comm.h"
 #include "biozap_freq.h"
@@ -154,7 +153,7 @@ void Delay(UART_HandleTypeDef *huart, uint32_t Del_Time)
 
 }
 
-void getParams(string inputString, paramstruc* param, UART_HandleTypeDef *huart, std::function<void (UART_HandleTypeDef *, string)> uart_TX_IT){
+void getParams(string inputString, paramstruc* param, UART_HandleTypeDef *huart){
 	int j = 0;
 	for (int i = 0; i < MAX_CMD_PARAMS; i++)
 			param->param[i] = "";
@@ -189,8 +188,8 @@ void beep(uint32_t delay_time){
 	HAL_GPIO_WritePin(Beep_GPIO_Port, Beep_Pin, GPIO_PIN_RESET);
 }
 
-void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleTypeDef *hdac, TIM_HandleTypeDef *htim, std::function<void (UART_HandleTypeDef *, string)> uart_TX_IT)
-{
+void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleTypeDef *hdac, TIM_HandleTypeDef *htim)
+{  // , std::function<void (UART_HandleTypeDef *, string)> uart_TX_IT   not needed
 	extern int BIOZAP_Sample_Lgth;
 
 	paramstruc param;
@@ -203,7 +202,7 @@ void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleT
 	while( (to = comm_Str.find(LF, from)+1) >= from ) {  // Get a Command String with LF ending.
 		string one_Str = comm_Str.substr(from, to-from); // from a string or a program.
 		from = to;
-		getParams(one_Str, &param, huart, uart_TX_IT); // set param[x]'s.
+		getParams(one_Str, &param, huart); // set param[x]'s.
 		findAndReplaceAll(one_Str, "\r", "");	// Delete all CR in the inp_Str
 		findAndReplaceAll(one_Str, "\n", EOL);	// Change all LF to EOL in the inp_Str
 		uart_TX_IT(huart, one_Str);
@@ -236,10 +235,10 @@ void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleT
 		else if (param.param[0] == "exe") {
 			int e_idx = std::stoi(param.param[1]);
 			if (e_idx > 0 && e_idx < 10) {
-				Command_Interpreter(internalProgram[e_idx].item, huart, hdac, htim, uart_TX_IT);
+				Command_Interpreter(internalProgram[e_idx].item, huart, hdac, htim);
 			}
 			else if (e_idx == 0) {
-				Command_Interpreter(user_Program, huart, hdac, htim, uart_TX_IT);
+				Command_Interpreter(user_Program, huart, hdac, htim);
 			}
 			else {
 				uart_TX_IT(huart, "Param[1] error ->"+param.param[1]+"<-"+EOL);
@@ -298,9 +297,9 @@ void Command_Interpreter(string comm_Str, UART_HandleTypeDef *huart, DAC_HandleT
 void Cmd_Interpreter(UART_HandleTypeDef *huart, DAC_HandleTypeDef *hdac, TIM_HandleTypeDef *htim)
 {
 	if (huart->Instance == USART2) {
-		Command_Interpreter(command_Line, huart, hdac, htim , uart_TX_IT);
+		Command_Interpreter(command_Line, huart, hdac, htim );
 	}
 	if (huart->Instance == USART1) {
-		Command_Interpreter(command_Line1, huart, hdac, htim , uart_TX_IT);
+		Command_Interpreter(command_Line1, huart, hdac, htim );
 	}
 }
